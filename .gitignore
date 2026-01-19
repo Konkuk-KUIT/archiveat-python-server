@@ -1,0 +1,8 @@
+# .gitignore 내용
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+temp_audio.mp3
+downloaded_audio.mp3
+.env
