@@ -26,6 +26,6 @@ def download_audio_only(url):
         return None
 
 if __name__ == "__main__":
-    # 아까 자막 추출에 실패했던 그 영상으로 다시 도전해봅시다.
+    # test
     test_url = "https://www.youtube.com/watch?v=BboE9i7TwzM"
     download_audio_only(test_url)
