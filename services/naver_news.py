@@ -39,6 +39,10 @@ class NaverNewsProcessor:
         """
         try:
             logger.info(f"Fetching content from: {url}")
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return {"type": "ERROR", "error": "Invalid URL scheme"}
+
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             html = response.text
@@ -160,7 +164,7 @@ if __name__ == "__main__":
     processor = NaverNewsProcessor()
     
     # 네이버 뉴스 예시
-    test_url = "https://n.news.naver.com/mnews/article/629/0000461258"
+    test_url = "https://n.news.naver.com/article/421/0008745941?cds=news_media_pc&type=editn"
     result = processor.process(test_url)
     
     print(f"Type: {result['type']}")

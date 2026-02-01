@@ -23,14 +23,14 @@
 
 ## 📁 생성된 파일
 
-- [`services/naver_news.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/services/naver_news.py) - 크롤러 로직
-- [`test_naver_news.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/test_naver_news.py) - 테스트 스크립트
+- [`services/naver_news.py`](services/naver_news.py) - 크롤러 로직
+- [`test_naver_news.py`](test_naver_news.py) - 테스트 스크립트
 
 ## 🔄 수정된 파일
 
-- [`main.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/main.py) - `/api/v1/summarize/naver-news` 엔드포인트 추가
-- [`models.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/models.py) - `SummarizeNaverNewsRequest` 모델 추가
-- [`requirements.txt`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/requirements.txt) - 웹 스크래핑 라이브러리 추가
+- [`main.py`](main.py) - `/api/v1/summarize/naver-news` 엔드포인트 추가
+- [`models.py`](models.py) - `SummarizeNaverNewsRequest` 모델 추가
+- [`requirements.txt`](requirements.txt) - 웹 스크래핑 라이브러리 추가
 
 ## 🚀 사용 방법
 

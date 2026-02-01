@@ -23,8 +23,8 @@ class YouTubeProcessor:
         print(f"✅ Faster Whisper {model_size} 모델 로드 완료!")
         
         # [수정 1] FFmpeg 경로 명시 (환경 변수 문제 방지)
-        ffmpeg_path = r"C:\\ffmpeg-8.0.1-essentials_build\\ffmpeg\bin\\ffmpeg.exe" 
-
+        ffmpeg_path = os.environ.get('FFMPEG_PATH') or shutil.which('ffmpeg')
+        
         # [수정 2] yt-dlp 옵션 최적화
         self.ydl_opts = {
             'format': 'bestaudio/best',

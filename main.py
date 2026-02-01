@@ -32,7 +32,7 @@ app = FastAPI(
 # CORS 설정 - Java 서버에서 호출 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 구체적인 origin 지정 권장
+    allow_origins=["http://localhost:8080", "http://localhost:3000"],  # 프로덕션에서는 구체적인 origin 지정 권장
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,8 +96,9 @@ async def summarize_youtube(request: SummarizeYoutubeRequest):
         
         # newsletter_summary를 Pydantic 모델로 변환
         newsletter_blocks = [
-            NewsletterSummaryBlock(title=block["title"], content=block["content"])
+            NewsletterSummaryBlock(title=block.get("title", ""), content=block.get("content", ""))
             for block in analysis_result.get("newsletter_summary", [])
+            if isinstance(block, dict)
         ]
         
         analysis = Analysis(
