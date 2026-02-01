@@ -1,0 +1,159 @@
+# 네이버 뉴스 크롤링 & 요약 통합 가이드
+
+## 📋 개요
+
+네이버 뉴스 및 일반 웹 콘텐츠를 크롤링하고 Gemini AI로 요약하는 기능을 Python 서버에 통합했습니다.
+
+## 🎯 주요 기능
+
+### 1. **사용자 메모 기반 분류**
+사용자가 제공한 메모를 우선적으로 고려하여 카테고리/토픽을 결정합니다.
+
+**예시**:
+- 기사: "애플 비전 프로 출시" (원래는 IT/과학 > 테크)
+- 메모: "애플 주가 분석용"
+- 결과: **경제 > 주식**으로 분류 ✅
+
+### 2. **자동 크롤러 선택**
+- **네이버 뉴스**: 특화된 파서로 정확한 본문 추출
+- **일반 웹**: readability 라이브러리로 본문 추출
+
+### 3. **Gemini AI 요약**
+기존 `summarizer.py`를 활용하여 5가지 카테고리 & 토픽으로 분류 + 3단계 요약
+
+## 📁 생성된 파일
+
+- [`services/naver_news.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/services/naver_news.py) - 크롤러 로직
+- [`test_naver_news.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/test_naver_news.py) - 테스트 스크립트
+
+## 🔄 수정된 파일
+
+- [`main.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/main.py) - `/api/v1/summarize/naver-news` 엔드포인트 추가
+- [`models.py`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/models.py) - `SummarizeNaverNewsRequest` 모델 추가
+- [`requirements.txt`](file:///c:/Users/samsung-user/Documents/KU/clubs/KUIT/archiveat/archiveat-python-server/requirements.txt) - 웹 스크래핑 라이브러리 추가
+
+## 🚀 사용 방법
+
+### 1. 의존성 설치
+```bash
+cd archiveat-python-server
+pip install -r requirements.txt
+```
+
+### 2. 로컬 테스트 (서버 없이)
+```bash
+python test_naver_news.py
+```
+
+### 3. FastAPI 서버 실행
+```bash
+python -m uvicorn main:app --reload --port 8000
+```
+
+### 4. API 호출 예시
+
+#### curl로 테스트
+```bash
+curl -X POST http://localhost:8000/api/v1/summarize/naver-news \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://n.news.naver.com/mnews/article/629/0000461258",
+    "user_memo": "반도체 관련주 주가 영향 분석용"
+  }'
+```
+
+#### Python requests로 테스트
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/api/v1/summarize/naver-news",
+    json={
+        "url": "https://n.news.naver.com/mnews/article/629/0000461258",
+        "user_memo": "반도체 관련주 주가 영향 분석용"  # 선택사항
+    }
+)
+
+print(response.json())
+```
+
+## 📊 API 응답 형식
+
+```json
+{
+  "video_info": null,
+  "analysis": {
+    "category": "경제",
+    "topic": "주식",
+    "small_card_summary": "20자 요약...",
+    "medium_card_summary": "2-3문장 요약...",
+    "newsletter_summary": [
+      {
+        "title": "소제목1",
+        "content": "내용1"
+      },
+      {
+        "title": "소제목2",
+        "content": "내용2"
+      },
+      {
+        "title": "소제목3",
+        "content": "내용3"
+      }
+    ]
+  }
+}
+```
+
+## 🔗 Java 서버 연동
+
+Java 서버에서는 기존 `/api/v1/summarize/youtube` 엔드포인트와 동일한 방식으로 호출 가능합니다.
+
+**PythonClientService 확장 필요 (선택사항)**:
+```java
+public CompletableFuture<PythonSummaryResponse> requestNaverNewsSummary(String url, String userMemo) {
+    // POST /api/v1/summarize/naver-news
+    // ...
+}
+```
+
+## ⚠️ 주의사항
+
+1. **Gemini API 키**: `.env` 파일에 `GEMINI_API_KEY` 설정 필수
+2. **크롤링 제한**: 일부 사이트는 크롤링을 차단할 수 있습니다
+3. **처리 시간**: 5-10초 소요 (크롤링 2-3초 + Gemini 3-7초)
+4. **User-Agent**: 차단 방지를 위해 헤더 설정됨
+
+## 🧪 테스트 결과 예시
+
+```
+TEST 1: 네이버 뉴스 크롤링
+============================================================
+Type: NAVER_NEWS
+Title: [단독] 삼성전자, AI 반도체 개발 박차...
+Content (first 200 chars): 삼성전자가 인공지능(AI) 반도체 개발에 박차를 가하고 있다...
+Thumbnail: https://...
+
+TEST 2: 네이버 뉴스 크롤링 + Gemini 요약
+============================================================
+✅ 제목: [단독] 삼성전자, AI 반도체 개발 박차...
+✅ 본문 길이: 2453 characters
+✅ 사용자 메모: 반도체 관련주 주가 영향 분석용
+
+최종 결과 (JSON)
+============================================================
+{
+  "category": "경제",
+  "topic": "주식",
+  "small_card_summary": "삼성전자 AI 반도체 개발 가속화",
+  ...
+}
+```
+
+## 🎓 확장 아이디어
+
+1. **캐싱**: 동일 URL 재요청 시 DB/Redis 캐시 활용
+2. **배치 처리**: 여러 URL 한번에 요약
+3. **이미지 추출**: 썸네일 외 본문 이미지도 저장
+4. **언론사 정보**: 네이버 뉴스 언론사 정보 추출
+5. **댓글 분석**: 네이버 댓글 크롤링 및 감성 분석
