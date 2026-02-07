@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from readability import Document
+from urllib.parse import urlparse
 import re
 import logging
 

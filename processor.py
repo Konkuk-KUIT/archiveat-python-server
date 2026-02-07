@@ -22,7 +22,7 @@ class ArchiveatProcessor:
         if "error" in video_data:
             return video_data
 
-        print(f"[2/2] Gemini AI 분석 및 요약 시작...")
+        print("[2/2] Gemini AI 분석 및 요약 시작...")
         # 2. 요약 엔진 실행 (분류 및 3단계 요약)
         # 제목과 자막을 함께 넘김
         analysis_result = self.summarizer.summarize_content(
@@ -57,7 +57,7 @@ class ArchiveatProcessor:
         if article_data.get("type") == "ERROR":
             return {"error": article_data.get("error", "Unknown error")}
 
-        print(f"[2/2] Gemini AI 분석 및 요약 시작...")
+        print("[2/2] Gemini AI 분석 및 요약 시작...")
         # 2. 요약 엔진 실행
         analysis_result = self.summarizer.summarize_content(
             article_data["title"],
