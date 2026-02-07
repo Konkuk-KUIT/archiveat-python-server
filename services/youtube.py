@@ -1,6 +1,7 @@
 import yt_dlp
 from faster_whisper import WhisperModel
 import os
+import shutil
 from youtube_transcript_api import YouTubeTranscriptApi
 
 class YouTubeProcessor:

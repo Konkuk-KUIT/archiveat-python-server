@@ -17,6 +17,11 @@ class SummarizeNaverNewsRequest(BaseModel):
     user_memo: Optional[str] = None  # 사용자 메모 (분류 우선순위에 활용)
 
 
+class SummarizeTistoryRequest(BaseModel):
+    url: str
+    user_memo: Optional[str] = None  # 사용자 메모 (분류 우선순위에 활용)
+
+
 # Response Models
 class VideoInfo(BaseModel):
     title: str

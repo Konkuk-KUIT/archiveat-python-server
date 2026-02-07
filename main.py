@@ -4,6 +4,7 @@ from models import (
     SummarizeYoutubeRequest,
     SummarizeGenericRequest,
     SummarizeNaverNewsRequest,
+    SummarizeTistoryRequest,
     PythonSummaryResponse,
     HealthResponse,
     VideoInfo,
@@ -14,6 +15,7 @@ from models import (
 from services.youtube import YouTubeProcessor
 from services.summarizer import GeminiSummarizer
 from services.naver_news import NaverNewsProcessor
+from services.tistory import TistoryProcessor
 import logging
 
 # 로깅 설정
@@ -43,6 +45,7 @@ app.add_middleware(
 yt_processor = YouTubeProcessor(model_size="tiny")
 summarizer = GeminiSummarizer()
 naver_processor = NaverNewsProcessor()
+tistory_processor = TistoryProcessor()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -252,6 +255,82 @@ async def summarize_naver_news(request: SummarizeNaverNewsRequest):
         raise
     except Exception as e:
         logger.exception(f"Unexpected error processing Naver news: {request.url}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/v1/summarize/tistory", response_model=PythonSummaryResponse)
+async def summarize_tistory(request: SummarizeTistoryRequest):
+    """
+    Tistory 블로그 URL을 받아 본문을 긁어오고 Gemini AI로 요약하여 응답
+    
+    처리 시간: 약 5-10초
+    - Tistory 크롤링: 1-2초
+    - Gemini LLM 요약: 3-7초
+    
+    naver_news, youtube와 독립적으로 동작하며 article_info + analysis 형식으로 응답합니다.
+    """
+    logger.info(f"Received Tistory summarization request: {request.url}")
+
+    try:
+        # 1. Tistory 크롤링
+        logger.info("Crawling Tistory content...")
+        crawl_result = tistory_processor.process(request.url)
+
+        if crawl_result.get("error"):
+            logger.error(f"Tistory crawling error: {crawl_result['error']}")
+            raise HTTPException(status_code=400, detail=f"Crawling failed: {crawl_result['error']}")
+
+        # 2. Gemini AI 분석 및 요약
+        logger.info("Starting Gemini AI analysis...")
+
+        content_with_memo = crawl_result["content"]
+        if request.user_memo:
+            content_with_memo = f"[사용자 메모: {request.user_memo}]\n\n{content_with_memo}"
+            logger.info(f"User memo provided: {request.user_memo}")
+
+        analysis_result = summarizer.summarize_content(
+            crawl_result["title"],
+            content_with_memo
+        )
+
+        if "error" in analysis_result:
+            logger.error(f"Gemini analysis error: {analysis_result['error']}")
+            raise HTTPException(status_code=500, detail=f"LLM analysis failed: {analysis_result['error']}")
+
+        # 3. 응답 데이터 구성 (naver_news와 동일한 article_info 형식)
+        newsletter_blocks = [
+            NewsletterSummaryBlock(title=block["title"], content=block["content"])
+            for block in analysis_result.get("newsletter_summary", [])
+        ]
+
+        analysis = Analysis(
+            category=analysis_result.get("category", "기타"),
+            topic=analysis_result.get("topic", "기타"),
+            small_card_summary=analysis_result.get("small_card_summary", ""),
+            medium_card_summary=analysis_result.get("medium_card_summary", ""),
+            newsletter_summary=newsletter_blocks
+        )
+
+        article_info = ArticleInfo(
+            title=crawl_result["title"],
+            thumbnail_url=crawl_result.get("thumbnail_url"),
+            content_url=request.url,
+            word_count=len(crawl_result["content"]),
+        )
+
+        response = PythonSummaryResponse(
+            video_info=None,
+            article_info=article_info,
+            analysis=analysis
+        )
+
+        logger.info(f"Successfully processed Tistory: {request.url}")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error processing Tistory: {request.url}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
