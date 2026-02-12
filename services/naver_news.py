@@ -91,11 +91,32 @@ class NaverNewsProcessor:
         title_tag = soup.select_one("#title_area span") or soup.select_one("h2#title_area")
         title = title_tag.text.strip() if title_tag else "제목 없음"
         
-        # 썸네일 추출 (첫 번째 이미지)
+        # 썸네일 추출 (향상된 로직)
         thumbnail_url = None
-        img_tag = soup.select_one("#img1") or soup.select_one("article img")
-        if img_tag and img_tag.get("src"):
-            thumbnail_url = img_tag.get("src")
+        
+        # 1. Open Graph 이미지 (가장 확실함)
+        og_image = soup.select_one("meta[property='og:image']")
+        if og_image and og_image.get("content"):
+            thumbnail_url = og_image.get("content")
+            
+        # 2. 본문 내 첫 번째 이미지 (HTML 구조 기반)
+        if not thumbnail_url:
+            # 사용자가 제공한 구조: #img1 (lazy loading 고려 data-src 확인)
+            img_tag = soup.select_one("#img1") 
+            if img_tag:
+                 thumbnail_url = img_tag.get("data-src") or img_tag.get("src")
+        
+        # 3. .end_photo_org 내부 이미지
+        if not thumbnail_url:
+            img_tag = soup.select_one(".end_photo_org img")
+            if img_tag:
+                thumbnail_url = img_tag.get("data-src") or img_tag.get("src")
+
+        # 4. 일반적인 본문 이미지 (fallback)
+        if not thumbnail_url:
+            img_tag = soup.select_one("#dic_area img") or soup.select_one("article img")
+            if img_tag:
+                thumbnail_url = img_tag.get("data-src") or img_tag.get("src")
         
         # 본문 추출
         content_area = soup.select_one("#dic_area") or soup.select_one("article#dic_area")
