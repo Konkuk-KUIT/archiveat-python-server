@@ -46,6 +46,7 @@ class NaverNewsProcessor:
 
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
+            response.encoding = 'utf-8'  # 명시적으로 UTF-8 인코딩 설정
             html = response.text
             
             # 네이버 뉴스인지 확인
