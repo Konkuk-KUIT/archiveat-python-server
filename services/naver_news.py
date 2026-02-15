@@ -4,8 +4,23 @@ from readability import Document
 from urllib.parse import urlparse
 import re
 import logging
+import random
+import time
 
 logger = logging.getLogger(__name__)
+
+# 실제 브라우저 User-Agent 목록 (최신 버전 기준)
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+]
+
+# 429 재시도 설정
+_MAX_RETRIES = 3
+_BASE_DELAY = 2  # 초
 
 
 class NaverNewsProcessor:
@@ -17,11 +32,50 @@ class NaverNewsProcessor:
     """
     
     def __init__(self):
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-    
+        # Session 사용 — 쿠키 자동 관리 + 커넥션 재활용
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": random.choice(_USER_AGENTS),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+        })
+
+    def _get_with_retry(self, url: str) -> requests.Response:
+        """429 에러 시 exponential backoff로 재시도"""
+        for attempt in range(_MAX_RETRIES + 1):
+            # 매 요청마다 User-Agent 랜덤 교체
+            self.session.headers["User-Agent"] = random.choice(_USER_AGENTS)
+            # 네이버 뉴스에는 Referer 추가 (요청 단위)
+            extra_headers = {}
+            if "naver.com" in url:
+                extra_headers["Referer"] = "https://search.naver.com/search.naver"
+
+            response = self.session.get(url, timeout=15, headers=extra_headers)
+
+            if response.status_code == 429:
+                if attempt < _MAX_RETRIES:
+                    delay = _BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"429 Too Many Requests, retrying in {delay:.1f}s (attempt {attempt + 1}/{_MAX_RETRIES})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"429 Too Many Requests after {_MAX_RETRIES} retries: {url}")
+                    response.raise_for_status()
+
+            response.raise_for_status()
+            return response
+
+        # Should not reach here, but just in case
+        raise requests.exceptions.RequestException("Max retries exceeded")
+
     def process(self, url: str) -> dict:
         """
         URL에서 콘텐츠를 크롤링하고 제목, 본문 추출
@@ -44,8 +98,7 @@ class NaverNewsProcessor:
             if parsed.scheme not in ("http", "https"):
                 return {"type": "ERROR", "error": "Invalid URL scheme"}
 
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
+            response = self._get_with_retry(url)
             response.encoding = 'utf-8'  # 명시적으로 UTF-8 인코딩 설정
             html = response.text
             
