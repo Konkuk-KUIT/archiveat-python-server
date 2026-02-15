@@ -53,11 +53,12 @@ class NaverNewsProcessor:
         for attempt in range(_MAX_RETRIES + 1):
             # 매 요청마다 User-Agent 랜덤 교체
             self.session.headers["User-Agent"] = random.choice(_USER_AGENTS)
-            # 네이버 뉴스에는 Referer 추가
+            # 네이버 뉴스에는 Referer 추가 (요청 단위)
+            extra_headers = {}
             if "naver.com" in url:
-                self.session.headers["Referer"] = "https://search.naver.com/search.naver"
+                extra_headers["Referer"] = "https://search.naver.com/search.naver"
 
-            response = self.session.get(url, timeout=15)
+            response = self.session.get(url, timeout=15, headers=extra_headers)
 
             if response.status_code == 429:
                 if attempt < _MAX_RETRIES:
