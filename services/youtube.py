@@ -21,17 +21,6 @@ class YouTubeProcessor:
         self.download_dir = "downloads"
         os.makedirs(self.download_dir, exist_ok=True)
 
-        # [추가] 환경 변수로부터 cookies.txt 생성 (GitHub Actions 등 CI/CD 환경 지원)
-        cookies_env = os.environ.get('COOKIES_TXT')
-        if cookies_env:
-            try:
-                # 환경 변수 내용은 줄바꿈 처리가 되어 있을 수 있음
-                # 만약 JSON 형태가 아니라 Netscape 포맷 텍스트라면 그대로 저장
-                with open('cookies.txt', 'w', encoding='utf-8') as f:
-                    f.write(cookies_env)
-                logger.info("✅ Created cookies.txt from COOKIES_TXT environment variable.")
-            except Exception as e:
-                logger.error(f"❌ Failed to create cookies.txt from environment variable: {e}")
 
         # 모델 로드 (CPU 최적화 설정)
         self.model = WhisperModel(
