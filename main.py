@@ -16,13 +16,34 @@ from services.youtube import YouTubeProcessor
 from services.summarizer import GeminiSummarizer
 from services.naver_news import NaverNewsProcessor
 from services.tistory import TistoryProcessor
+
+import asyncio # [추가] 비동기 처리를 위한 모듈
+
 import logging
+import sys
 
 # 로깅 설정
+# Uvicorn 실행 시 로그가 보이지 않는 문제 해결을 위해 stdout 핸들러 명시적 추가
+# 루트 로커에 핸들러를 추가하여 services 등 모든 모듈의 로그가 출력되도록 함
+# root_logger = logging.getLogger()
+# root_logger.setLevel(logging.INFO)
+
+# # 기본 핸들러가 없을 경우에만 추가 (중복 방지)
+# if not root_logger.handlers:
+#     handler = logging.StreamHandler(sys.stdout)
+#     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+#     root_logger.addHandler(handler)
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+    force=True
 )
+
+# 외부 라이브러리(httpx 등) 로그가 너무 시끄러우면 레벨 조정
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -69,17 +90,20 @@ async def summarize_youtube(request: SummarizeYoutubeRequest):
     logger.info(f"Received YouTube summarization request: {request.url}")
     
     try:
-        # 1. YouTube 데이터 추출
+        # 1. YouTube 데이터 추출 (Blocking -> Non-blocking)
         logger.info("Extracting YouTube data...")
-        video_data = yt_processor.process(request.url)
+        # [수정] 동기 함수인 yt_processor.process를 별도 스레드에서 실행
+        video_data = await asyncio.to_thread(yt_processor.process, request.url)
         
         if "error" in video_data:
             logger.error(f"YouTube processing error: {video_data['error']}")
             raise HTTPException(status_code=400, detail=video_data["error"])
         
-        # 2. Gemini AI 분석 및 요약
+        # 2. Gemini AI 분석 및 요약 (Blocking -> Non-blocking)
         logger.info("Starting Gemini AI analysis...")
-        analysis_result = summarizer.summarize_content(
+        # [수정] 동기 함수인 summarizer.summarize_content를 별도 스레드에서 실행
+        analysis_result = await asyncio.to_thread(
+            summarizer.summarize_content,
             video_data["title"],
             video_data["description"] + "\n" + video_data["transcript"]
         )
@@ -96,6 +120,8 @@ async def summarize_youtube(request: SummarizeYoutubeRequest):
             channel=video_data["channel"],
             duration=video_data["duration"]
         )
+        
+        # ... (생략) ...
         
         # newsletter_summary를 Pydantic 모델로 변환
         newsletter_blocks = [
@@ -131,14 +157,14 @@ async def summarize_youtube(request: SummarizeYoutubeRequest):
 async def summarize_generic(request: SummarizeGenericRequest):
     """
     일반 텍스트 콘텐츠 요약 (향후 확장용)
-    
-    YouTube가 아닌 블로그, 기사 등의 텍스트 콘텐츠 처리
     """
     logger.info(f"Received generic summarization request: {request.title}")
     
     try:
-        # Gemini AI 분석
-        analysis_result = summarizer.summarize_content(
+        # Gemini AI 분석 (Blocking -> Non-blocking)
+        # [수정] 별도 스레드 실행
+        analysis_result = await asyncio.to_thread(
+            summarizer.summarize_content,
             request.title,
             request.content
         )
@@ -146,6 +172,8 @@ async def summarize_generic(request: SummarizeGenericRequest):
         if "error" in analysis_result:
             logger.error(f"Gemini analysis error: {analysis_result['error']}")
             raise HTTPException(status_code=500, detail=f"LLM analysis failed: {analysis_result['error']}")
+        
+        # ... (생략) ...
         
         # newsletter_summary를 Pydantic 모델로 변환
         newsletter_blocks = [
@@ -162,7 +190,7 @@ async def summarize_generic(request: SummarizeGenericRequest):
         )
         
         response = PythonSummaryResponse(
-            video_info=None,  # 일반 텍스트는 video_info 없음
+            video_info=None,
             analysis=analysis
         )
         
@@ -180,35 +208,30 @@ async def summarize_generic(request: SummarizeGenericRequest):
 async def summarize_naver_news(request: SummarizeNaverNewsRequest):
     """
     네이버 뉴스 또는 일반 웹 콘텐츠 요약
-    
-    처리 시간: 약 5-10초
-    - 웹 크롤링: 2-3초
-    - Gemini LLM 요약: 3-7초
-    
-    사용자 메모를 활용하여 콘텐츠를 분류하고 요약합니다.
-    메모가 있으면 본문보다 메모의 의도를 우선시하여 카테고리/토픽을 결정합니다.
     """
     logger.info(f"Received Naver news summarization request: {request.url}")
     
     try:
-        # 1. 웹 크롤링 (네이버 뉴스 또는 일반 웹)
+        # 1. 웹 크롤링 (Blocking -> Non-blocking)
         logger.info("Crawling web content...")
-        crawl_result = naver_processor.process(request.url)
+        # [수정] 별도 스레드 실행
+        crawl_result = await asyncio.to_thread(naver_processor.process, request.url)
         
         if crawl_result.get("error"):
             logger.error(f"Crawling error: {crawl_result['error']}")
             raise HTTPException(status_code=400, detail=f"Crawling failed: {crawl_result['error']}")
         
-        # 2. Gemini AI 분석 및 요약
+        # 2. Gemini AI 분석 및 요약 (Blocking -> Non-blocking)
         logger.info("Starting Gemini AI analysis...")
         
-        # 사용자 메모가 있으면 본문 앞에 추가하여 분류에 활용
         content_with_memo = crawl_result["content"]
         if request.user_memo:
             content_with_memo = f"[사용자 메모: {request.user_memo}]\n\n{content_with_memo}"
             logger.info(f"User memo provided: {request.user_memo}")
         
-        analysis_result = summarizer.summarize_content(
+        # [수정] 별도 스레드 실행
+        analysis_result = await asyncio.to_thread(
+            summarizer.summarize_content,
             crawl_result["title"],
             content_with_memo
         )
@@ -217,8 +240,7 @@ async def summarize_naver_news(request: SummarizeNaverNewsRequest):
             logger.error(f"Gemini analysis error: {analysis_result['error']}")
             raise HTTPException(status_code=500, detail=f"LLM analysis failed: {analysis_result['error']}")
         
-        # 3. 응답 데이터 구성
-        # video_info는 None (뉴스/웹 콘텐츠는 영상이 아님)
+        # ... (생략) ...
         
         # newsletter_summary를 Pydantic 모델로 변환
         newsletter_blocks = [
@@ -234,17 +256,17 @@ async def summarize_naver_news(request: SummarizeNaverNewsRequest):
             newsletter_summary=newsletter_blocks
         )
         
-        # article_info 구성 (Naver News/일반 웹용)
+        # article_info 구성
         article_info = ArticleInfo(
             title=crawl_result["title"],
             thumbnail_url=crawl_result.get("thumbnail_url"),
             content_url=request.url,
-            word_count=len(crawl_result["content"])  # 글자 수 계산
+            word_count=len(crawl_result["content"])
         )
         
         response = PythonSummaryResponse(
-            video_info=None,  # 뉴스/웹 콘텐츠는 video_info 없음
-            article_info=article_info,  # article_info 추가!
+            video_info=None,
+            article_info=article_info,
             analysis=analysis
         )
         
@@ -262,25 +284,20 @@ async def summarize_naver_news(request: SummarizeNaverNewsRequest):
 async def summarize_tistory(request: SummarizeTistoryRequest):
     """
     Tistory 블로그 URL을 받아 본문을 긁어오고 Gemini AI로 요약하여 응답
-    
-    처리 시간: 약 5-10초
-    - Tistory 크롤링: 1-2초
-    - Gemini LLM 요약: 3-7초
-    
-    naver_news, youtube와 독립적으로 동작하며 article_info + analysis 형식으로 응답합니다.
     """
     logger.info(f"Received Tistory summarization request: {request.url}")
 
     try:
-        # 1. Tistory 크롤링
+        # 1. Tistory 크롤링 (Blocking -> Non-blocking)
         logger.info("Crawling Tistory content...")
-        crawl_result = tistory_processor.process(request.url)
+        # [수정] 별도 스레드 실행
+        crawl_result = await asyncio.to_thread(tistory_processor.process, request.url)
 
         if crawl_result.get("error"):
             logger.error(f"Tistory crawling error: {crawl_result['error']}")
             raise HTTPException(status_code=400, detail=f"Crawling failed: {crawl_result['error']}")
 
-        # 2. Gemini AI 분석 및 요약
+        # 2. Gemini AI 분석 및 요약 (Blocking -> Non-blocking)
         logger.info("Starting Gemini AI analysis...")
 
         content_with_memo = crawl_result["content"]
@@ -288,7 +305,9 @@ async def summarize_tistory(request: SummarizeTistoryRequest):
             content_with_memo = f"[사용자 메모: {request.user_memo}]\n\n{content_with_memo}"
             logger.info(f"User memo provided: {request.user_memo}")
 
-        analysis_result = summarizer.summarize_content(
+        # [수정] 별도 스레드 실행
+        analysis_result = await asyncio.to_thread(
+            summarizer.summarize_content,
             crawl_result["title"],
             content_with_memo
         )
@@ -297,7 +316,9 @@ async def summarize_tistory(request: SummarizeTistoryRequest):
             logger.error(f"Gemini analysis error: {analysis_result['error']}")
             raise HTTPException(status_code=500, detail=f"LLM analysis failed: {analysis_result['error']}")
 
-        # 3. 응답 데이터 구성 (naver_news와 동일한 article_info 형식)
+        # ... (생략) ...
+
+        # 3. 응답 데이터 구성
         newsletter_blocks = [
             NewsletterSummaryBlock(title=block["title"], content=block["content"])
             for block in analysis_result.get("newsletter_summary", [])
@@ -336,4 +357,4 @@ async def summarize_tistory(request: SummarizeTistoryRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=None)
