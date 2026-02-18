@@ -76,6 +76,38 @@ class GeminiSummarizer:
             print(f"Gemini API Error: {str(e)}")
             return {"error": str(e)}
 
+    def summarize_collection(self, newsletters):
+        """
+        뉴스레터 목록(제목+요약)을 입력받아 컬렉션용 요약(Small/Medium Card)을 생성합니다.
+        """
+        prompt = f"""
+        당신은 전문 에디터입니다. 아래 제공된 {len(newsletters)}개의 뉴스레터 요약본들을 바탕으로, 이들을 하나로 묶는 컬렉션(모음집)의 제목과 설명을 작성해주세요.
+        
+        ### 입력 데이터(뉴스레터 목록):
+        {json.dumps(newsletters, ensure_ascii=False, indent=2)}
+
+        ### ★필수 반환 필드 및 조건 (정확히 지킬 것)★:
+        JSON 형식으로만 응답하세요.
+
+        {{
+            "small_card_summary": "컬렉션의 실질적인 제목 역할. 3~4단어로 핵심을 관통하는 문구 (예: '생산성을 높이는 툴', '개발자 커리어 조언')",
+            "medium_card_summary": "어떤 뉴스레터들을 위주로 모았는지, 이 컬렉션이 독자에게 어떤 가치를 주는지 설명하는 1개의 자연스러운 문장 (예: '실무에서 바로 쓸 수 있는 생산성 도구들과 활용법을 모았습니다.')"
+        }}
+        """
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=prompt,
+                config={
+                    'response_mime_type': 'application/json'
+                }
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Gemini API Error (Collection): {str(e)}")
+            return {"error": str(e)}
+
 if __name__ == "__main__":
     summarizer = GeminiSummarizer()
     # 테스트 데이터
