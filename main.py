@@ -1,24 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from models import (
-    SummarizeYoutubeRequest,
-    SummarizeGenericRequest,
-    SummarizeNaverNewsRequest,
-    SummarizeTistoryRequest,
-    PythonSummaryResponse,
-    HealthResponse,
-    VideoInfo,
-    ArticleInfo,
-    Analysis,
-    NewsletterSummaryBlock
-)
-from services.youtube import YouTubeProcessor
-from services.summarizer import GeminiSummarizer
-from services.naver_news import NaverNewsProcessor
-from services.tistory import TistoryProcessor
-
 import asyncio # [추가] 비동기 처리를 위한 모듈
-
+import os
 import logging
 import sys
 
@@ -41,10 +22,57 @@ logging.basicConfig(
     force=True
 )
 
+logger = logging.getLogger(__name__)
+
+def setup_cookies():
+    """GitHub Secrets에서 전달된 COOKIES_TXT 환경변수를 파일로 저장합니다."""
+    cookies_content = os.getenv("COOKIES_TXT")
+    
+    # 현재 작업 디렉토리 기준 절대 경로 설정
+    cookie_path = os.path.join(os.getcwd(), "cookies.txt")
+    
+    if cookies_content:
+        logger.info(f"🍪 COOKIES_TXT environment variable found. Length: {len(cookies_content)}")
+        try:
+            with open(cookie_path, "w", encoding="utf-8") as f:
+                f.write(cookies_content)
+            logger.info(f"✅ Created cookies.txt from environment variable at: {cookie_path}")
+            
+            # 파일 내용 앞부분만 살짝 찍어서 확인
+            with open(cookie_path, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+                logger.info(f"   First line of cookies.txt: {first_line[:50]}...")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to create cookies.txt: {e}")
+    else:
+        logger.warning("⚠️ COOKIES_TXT environment variable is missing. YouTube processing might fail.")
+
+# [수정 3] 서비스 임포트 및 초기화 전에 쿠키 설정을 먼저 실행!!
+setup_cookies()
+
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from models import (
+    SummarizeYoutubeRequest,
+    SummarizeGenericRequest,
+    SummarizeNaverNewsRequest,
+    SummarizeTistoryRequest,
+    PythonSummaryResponse,
+    HealthResponse,
+    VideoInfo,
+    ArticleInfo,
+    Analysis,
+    NewsletterSummaryBlock
+)
+from services.youtube import YouTubeProcessor
+from services.summarizer import GeminiSummarizer
+from services.naver_news import NaverNewsProcessor
+from services.tistory import TistoryProcessor
+
 # 외부 라이브러리(httpx 등) 로그가 너무 시끄러우면 레벨 조정
 logging.getLogger("httpx").setLevel(logging.WARNING)
-
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Archiveat Python Server",
