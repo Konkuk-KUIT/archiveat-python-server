@@ -105,7 +105,7 @@ async def summarize_youtube(request: SummarizeYoutubeRequest):
         analysis_result = await asyncio.to_thread(
             summarizer.summarize_content,
             video_data["title"],
-            video_data["description"] + "\n" + video_data["transcript"]
+            (video_data.get("description") or "") + "\n" + (video_data.get("transcript") or "")
         )
         
         if "error" in analysis_result:

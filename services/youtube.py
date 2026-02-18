@@ -180,22 +180,22 @@ class YouTubeProcessor:
                 # Faster Whisper transcribe
                 logger.info("Starting Whisper transcription...")
                 log_memory_usage("Before Transcribe")
-                segments, info = self.model.transcribe(
-                    abs_file_path, # 절대 경로 사용
-                    language="ko",
-                    beam_size=5,
-                    vad_filter=True,
-                )
-                
-                transcript_text = " ".join([segment.text for segment in segments])
-                video_data["transcript"] = transcript_text
-                
-                # 사용 완료된 오디오 파일 삭제 (청소)
-                if os.path.exists(abs_file_path):
-                    os.remove(abs_file_path)
-                
-                logger.info(f"✅ 음성 인식 완료! (언어: {info.language}, 확률: {info.language_probability:.2f})")
-                log_memory_usage("After Transcribe")
+                try:
+                    segments, info = self.model.transcribe(
+                        abs_file_path, # 절대 경로 사용
+                        language="ko",
+                        beam_size=5,
+                        vad_filter=True,
+                    )
+                    
+                    transcript_text = " ".join([segment.text for segment in segments])
+                    video_data["transcript"] = transcript_text
+                    
+                    logger.info(f"✅ 음성 인식 완료! (언어: {info.language}, 확률: {info.language_probability:.2f})")
+                    log_memory_usage("After Transcribe")
+                finally:
+                    if os.path.exists(abs_file_path):
+                        os.remove(abs_file_path)
 
             return video_data
 
