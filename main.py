@@ -55,14 +55,20 @@ def setup_cookies():
                     fixed_lines.append(line)
                     continue
                 
-                # [핵심] 탭(\t)이 없고 공백이 2개 이상 연속되면 탭으로 변환
-                # 환경 변수 전달 과정에서 탭이 스페이스로 변환되는 문제를 방지합니다.
-                if '\t' not in line:
+                
+                # [개선] 리터럴 \t 문자 처리 (환경변수 주입 시 이스케이프된 경우)
+                if '\\t' in line:
+                    line = line.replace('\\t', '\t')
+                
+                # [개선] 탭 개수가 부족하면(7컬럼 기준 6개 탭 필요) 스페이스 변환 시도
+                if line.count('\t') < 6:
                     # 공백이 2개 이상인 부분을 찾아 탭으로 바꿉니다.
+                    # 단, 이미 탭이 있는 경우 섞이지 않도록 주의 (여기선 탭이 부족하므로 시도)
                     fixed_line = re.sub(r'\s{2,}', '\t', line)
-                    fixed_lines.append(fixed_line)
-                else:
-                    fixed_lines.append(line)
+                    if fixed_line.count('\t') >= 6:
+                        line = fixed_line
+                        
+                fixed_lines.append(line)
             
             final_content = '\n'.join(fixed_lines)
             
@@ -75,9 +81,11 @@ def setup_cookies():
             
             logger.info(f"✅ Created and fixed cookies.txt (Size: {len(final_content)} bytes)")
             
-            # 검증용: 첫 줄 50글자만 출력
+            # 검증용: 첫 줄 내용 및 Hex 값 출력 (인코딩/특수문자 확인용)
             with open(cookie_path, "r", encoding="utf-8") as f:
                 first_line = f.readline().strip()
+                logger.info(f"   First line: {first_line[:100]}")
+                logger.info(f"   First line HEX: {first_line[:50].encode('utf-8').hex(' ')}")
                 logger.info(f"   First line: {first_line[:50]}...")
                 
         except Exception as e:
