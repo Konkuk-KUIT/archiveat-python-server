@@ -11,7 +11,10 @@ ENV SENTRY_DSN=${SENTRY_DSN}
 ENV SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
 
 # curl 설치 (health check용)
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 
 # requirements.txt 복사 및 설치
 COPY requirements.cpu.txt .
