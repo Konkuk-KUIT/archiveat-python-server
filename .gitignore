@@ -6,3 +6,4 @@ __pycache__/
 temp_audio.mp3
 downloaded_audio.mp3
 .env
+cookies.txt
