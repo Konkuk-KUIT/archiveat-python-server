@@ -1,5 +1,8 @@
 name: Deploy (SSH)
 
+env:
+  COOKIES_TXT: ${{ secrets.COOKIES_TXT }}
+
 on:
   push:
     branches: ["main"]
