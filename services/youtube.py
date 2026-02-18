@@ -44,7 +44,8 @@ class YouTubeProcessor:
                 'preferredquality': '192',
             }],
             'ffmpeg_location': ffmpeg_path, # 명시적 경로 설정
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None, # 쿠키 자동 감지
+            # [수정] 쿠키 파일절대경로 주입 (파일 존재 여부와 무관하게 설정)
+            'cookiefile': os.path.abspath('cookies.txt'),
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,

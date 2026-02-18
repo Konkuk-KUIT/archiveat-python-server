@@ -24,27 +24,71 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+# [수정] 정규표현식 모듈 추가
+import re
+
 def setup_cookies():
-    """GitHub Secrets에서 전달된 COOKIES_TXT 환경변수를 파일로 저장합니다."""
-    cookies_content = os.getenv("COOKIES_TXT")
+    """GitHub Secrets에서 전달된 COOKIES_TXT 환경변수를 파일로 저장합니다.
+    환경 변수 전달 과정에서 깨진 탭(\t)을 복구하고 Netscape 헤더를 보장합니다.
+    """
+    raw_content = os.getenv("COOKIES_TXT")
+    cookie_path = os.path.abspath("cookies.txt")
     
-    # 현재 작업 디렉토리 기준 절대 경로 설정
-    cookie_path = os.path.join(os.getcwd(), "cookies.txt")
-    
-    if cookies_content:
-        logger.info(f"🍪 COOKIES_TXT environment variable found. Length: {len(cookies_content)}")
+    if raw_content:
+        logger.info(f"🍪 COOKIES_TXT found. Processing format... (Length: {len(raw_content)})")
+        
         try:
-            with open(cookie_path, "w", encoding="utf-8") as f:
-                f.write(cookies_content)
-            logger.info(f"✅ Created cookies.txt from environment variable at: {cookie_path}")
+            # 1. 따옴표 및 불필요한 공백 제거
+            content = raw_content.strip().strip('"').strip("'")
             
-            # 파일 내용 앞부분만 살짝 찍어서 확인
+            lines = content.split('\\n') # 환경변수에선 줄바꿈이 \\n 문자로 들어올 수도 있음
+            if len(lines) == 1:
+                 lines = content.split('\n') # 실제 줄바꿈일 수도 있음
+
+            fixed_lines = []
+            
+            for line in lines:
+                line = line.strip()
+                # 빈 줄이나 주석은 그대로 둠
+                if not line or line.startswith('#'):
+                    fixed_lines.append(line)
+                    continue
+                
+                # [핵심] 탭(\t)이 없고 공백이 2개 이상 연속되면 탭으로 변환
+                # 환경 변수 전달 과정에서 탭이 스페이스로 변환되는 문제를 방지합니다.
+                if '\t' not in line:
+                    # 공백이 2개 이상인 부분을 찾아 탭으로 바꿉니다.
+                    fixed_line = re.sub(r'\s{2,}', '\t', line)
+                    fixed_lines.append(fixed_line)
+                else:
+                    fixed_lines.append(line)
+            
+            final_content = '\n'.join(fixed_lines)
+            
+            # 2. Netscape 헤더가 없으면 강제로 추가
+            if not final_content.startswith('# Netscape'):
+                final_content = "# Netscape HTTP Cookie File\n" + final_content
+                
+            with open(cookie_path, "w", encoding="utf-8") as f:
+                f.write(final_content)
+            
+            logger.info(f"✅ Created and fixed cookies.txt (Size: {len(final_content)} bytes)")
+            
+            # 검증용: 첫 줄 50글자만 출력
             with open(cookie_path, "r", encoding="utf-8") as f:
                 first_line = f.readline().strip()
-                logger.info(f"   First line of cookies.txt: {first_line[:50]}...")
+                logger.info(f"   First line: {first_line[:50]}...")
                 
         except Exception as e:
             logger.error(f"❌ Failed to create cookies.txt: {e}")
+            # 실패해도 일단 원본이라도 저장 시도 (Fallback)
+            try:
+                with open(cookie_path, "w", encoding="utf-8") as f:
+                    f.write(raw_content)
+                logger.warning("⚠️ Saved raw content as cookies.txt due to processing error.")
+            except:
+                pass
     else:
         logger.warning("⚠️ COOKIES_TXT environment variable is missing. YouTube processing might fail.")
 
