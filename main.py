@@ -111,7 +111,9 @@ from models import (
     SummarizeGenericRequest,
     SummarizeNaverNewsRequest,
     SummarizeTistoryRequest,
+    SummarizeCollectionRequest,
     PythonSummaryResponse,
+    CollectionSummaryResponse,
     HealthResponse,
     VideoInfo,
     ArticleInfo,
@@ -432,6 +434,40 @@ async def summarize_tistory(request: SummarizeTistoryRequest):
         raise
     except Exception as e:
         logger.exception(f"Unexpected error processing Tistory: {request.url}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/v1/summarize/collection", response_model=CollectionSummaryResponse)
+async def summarize_collection(request: SummarizeCollectionRequest):
+    """
+    여러 뉴스레터의 제목/요약을 입력받아 컬렉션용 타이틀(Small Card)과 설명(Medium Card)을 생성
+    """
+    logger.info(f"Received collection summarization request for {len(request.newsletters)} items")
+    
+    try:
+        # Gemini AI 분석 (Blocking -> Non-blocking)
+        # [수정] 별도 스레드 실행
+        analysis_result = await asyncio.to_thread(
+            summarizer.summarize_collection,
+            request.newsletters
+        )
+        
+        if "error" in analysis_result:
+            logger.error(f"Gemini analysis error: {analysis_result['error']}")
+            raise HTTPException(status_code=500, detail=f"LLM analysis failed: {analysis_result['error']}")
+        
+        response = CollectionSummaryResponse(
+            small_card_summary=analysis_result.get("small_card_summary", ""),
+            medium_card_summary=analysis_result.get("medium_card_summary", "")
+        )
+        
+        logger.info("Successfully processed collection summary")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error processing collection summary")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 

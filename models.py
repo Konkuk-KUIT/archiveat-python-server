@@ -22,6 +22,16 @@ class SummarizeTistoryRequest(BaseModel):
     user_memo: Optional[str] = None  # 사용자 메모 (분류 우선순위에 활용)
 
 
+class SummarizeCollectionRequest(BaseModel):
+    # 각 뉴스레터의 제목과 요약(small_card_summary 등)을 리스트로 전달받음
+    newsletters: List[str] 
+
+
+class CollectionSummaryResponse(BaseModel):
+    small_card_summary: str
+    medium_card_summary: str
+
+
 # Response Models
 class VideoInfo(BaseModel):
     title: str
