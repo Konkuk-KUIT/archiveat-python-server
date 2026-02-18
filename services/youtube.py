@@ -4,14 +4,11 @@ import os
 import shutil
 from youtube_transcript_api import YouTubeTranscriptApi
 import logging
-import psutil
+
 
 logger = logging.getLogger(__name__)
 
-def log_memory_usage(stage=""):
-    process = psutil.Process(os.getpid())
-    mem_info = process.memory_info()
-    logger.info(f"[{stage}] Memory Usage: {mem_info.rss / 1024 / 1024:.2f} MB")
+
 
 class YouTubeProcessor:
     def __init__(self, model_size="base"):
@@ -94,7 +91,7 @@ class YouTubeProcessor:
 
     def process(self, url):
         logger.info(f"Processing YouTube URL: {url}")
-        log_memory_usage("Start Processing")
+
         try:
             # 1. 영상 정보 추출 (다운로드 X)
             # [수정 5] 포맷 오류 시 재시도 로직 추가
@@ -179,7 +176,7 @@ class YouTubeProcessor:
 
                 # Faster Whisper transcribe
                 logger.info("Starting Whisper transcription...")
-                log_memory_usage("Before Transcribe")
+
                 try:
                     segments, info = self.model.transcribe(
                         abs_file_path, # 절대 경로 사용
@@ -192,7 +189,7 @@ class YouTubeProcessor:
                     video_data["transcript"] = transcript_text
                     
                     logger.info(f"✅ 음성 인식 완료! (언어: {info.language}, 확률: {info.language_probability:.2f})")
-                    log_memory_usage("After Transcribe")
+
                 finally:
                     if os.path.exists(abs_file_path):
                         os.remove(abs_file_path)
